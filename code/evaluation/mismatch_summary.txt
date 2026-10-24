@@ -1,0 +1,205 @@
+
+==================================================
+CASE: case_01 | Status: Pred=COMPLETE | Truth=COMPLETE
+Steps count: Pred=0 | Truth=1
+  Missing steps:
+    - #1 VERIFICATION account_service:account_001 VERIFY_RECORD_ABSENT ABSENT ev=evidence_54
+
+==================================================
+CASE: case_02 | Status: Pred=COMPLETE | Truth=COMPLETE
+Steps count: Pred=0 | Truth=1
+  Missing steps:
+    - #1 VERIFICATION account_service:account_002 VERIFY_RECORD_ABSENT ABSENT ev=evidence_54
+
+==================================================
+CASE: case_03 | Status: Pred=INCOMPLETE | Truth=COMPLETE
+Steps count: Pred=3 | Truth=3
+  Missing steps:
+    - #1 VERIFICATION account_service:account_7566 VERIFY_RECORD_ABSENT ABSENT ev=evidence_94
+    - #2 VERIFICATION security_service:audit_record_2016 VERIFY_RECORD_PRESENT PRESENT ev=evidence_94
+    - #3 VERIFICATION analytics_platform:analytics_9406 VERIFY_RECORD_ANONYMIZED ANONYMIZED ev=evidence_94
+  Extra steps:
+    + #1 FINDING account_service:account_7566 REPORT_REMAINING_RECORD PRESENT ev=evidence_94
+    + #2 REMEDIATION account_service:account_7566 DELETE_RECORD ABSENT ev=
+    + #3 VERIFICATION account_service:account_7566 VERIFY_RECORD_ABSENT ABSENT ev=
+
+==================================================
+CASE: case_04 | Status: Pred=COMPLETE | Truth=COMPLETE
+Steps count: Pred=0 | Truth=2
+  Missing steps:
+    - #1 VERIFICATION account_service:account_004 VERIFY_RECORD_ABSENT ABSENT ev=evidence_54
+    - #2 VERIFICATION analytics_platform:analytics_901 VERIFY_RECORD_ANONYMIZED ANONYMIZED ev=evidence_56
+
+==================================================
+CASE: case_07 | Status: Pred=COMPLETE | Truth=INCOMPLETE
+Steps count: Pred=1 | Truth=4
+  Missing steps:
+    - #1 FINDING support_platform:support_001 REPORT_REMAINING_RECORD PRESENT ev=evidence_58
+    - #2 REMEDIATION support_platform:support_001 DELETE_RECORD ABSENT ev=
+    - #3 VERIFICATION account_service:account_007 VERIFY_RECORD_ABSENT ABSENT ev=
+    - #4 VERIFICATION support_platform:support_001 VERIFY_RECORD_ABSENT ABSENT ev=
+  Extra steps:
+    + #1 VERIFICATION unknown_system:support VERIFY_RECORD_ABSENT ABSENT ev=evidence_58
+
+==================================================
+CASE: case_08 | Status: Pred=INCOMPLETE | Truth=INCOMPLETE
+Steps count: Pred=3 | Truth=4
+  Missing steps:
+    - #3 VERIFICATION account_service:account_008 VERIFY_RECORD_ABSENT ABSENT ev=
+
+==================================================
+CASE: case_09 | Status: Pred=INCOMPLETE | Truth=INCOMPLETE
+Steps count: Pred=3 | Truth=5
+  Missing steps:
+    - #3 VERIFICATION account_service:account_3960 VERIFY_RECORD_ABSENT ABSENT ev=
+    - #4 VERIFICATION security_service:audit_record_4902 VERIFY_RECORD_PRESENT PRESENT ev=
+
+==================================================
+CASE: case_10 | Status: Pred=INCOMPLETE | Truth=INCOMPLETE
+Steps count: Pred=3 | Truth=4
+  Missing steps:
+    - #1 FINDING support_platform:support_002 REPORT_REMAINING_RECORD PRESENT ev=evidence_61
+    - #2 REMEDIATION support_platform:support_002 DELETE_RECORD ABSENT ev=
+    - #3 VERIFICATION account_service:account_010 VERIFY_RECORD_ABSENT ABSENT ev=
+    - #4 VERIFICATION support_platform:support_002 VERIFY_RECORD_ABSENT ABSENT ev=
+  Extra steps:
+    + #1 FINDING support_platform:support_002 REPORT_EXPOSED_PII PRESENT ev=evidence_61
+    + #2 REMEDIATION support_platform:support_002 REDACT_RECORD REDACTED ev=
+    + #3 VERIFICATION support_platform:support_002 VERIFY_RECORD_REDACTED REDACTED ev=
+
+==================================================
+CASE: case_12 | Status: Pred=COMPLETE | Truth=INCOMPLETE
+Steps count: Pred=1 | Truth=5
+  Missing steps:
+    - #1 FINDING analytics_platform:analytics_9914 REPORT_REMAINING_RECORD PRESENT ev=evidence_01
+    - #2 REMEDIATION analytics_platform:analytics_9914 DELETE_RECORD ABSENT ev=
+    - #3 VERIFICATION account_service:account_9797 VERIFY_RECORD_ABSENT ABSENT ev=
+    - #4 VERIFICATION analytics_platform:analytics_9914 VERIFY_RECORD_ABSENT ABSENT ev=
+    - #5 VERIFICATION security_service:audit_record_2945 VERIFY_RECORD_PRESENT PRESENT ev=
+  Extra steps:
+    + #1 VERIFICATION account_service:account_9797 VERIFY_RECORD_ABSENT ABSENT ev=evidence_01
+
+==================================================
+CASE: case_17 | Status: Pred=INCOMPLETE | Truth=INCOMPLETE
+Steps count: Pred=7 | Truth=5
+  Missing steps:
+    - #4 VERIFICATION security_service:audit_record_1797 VERIFY_RECORD_PRESENT PRESENT ev=
+  Extra steps:
+    + #1 FINDING account_service:account_6523 REPORT_REMAINING_RECORD PRESENT ev=evidence_67
+    + #4 REMEDIATION account_service:account_6523 DELETE_RECORD ABSENT ev=
+    + #6 VERIFICATION account_service:account_6523 VERIFY_RECORD_ABSENT ABSENT ev=
+
+==================================================
+CASE: case_18 | Status: Pred=INCOMPLETE | Truth=INCOMPLETE
+Steps count: Pred=12 | Truth=14
+  Missing steps:
+    - #9 VERIFICATION account_service:account_5521 VERIFY_RECORD_ABSENT ABSENT ev=
+    - #11 VERIFICATION security_service:audit_record_6645 VERIFY_RECORD_PRESENT PRESENT ev=
+
+==================================================
+CASE: case_20 | Status: Pred=INCOMPLETE | Truth=INCOMPLETE
+Steps count: Pred=6 | Truth=8
+  Missing steps:
+    - #5 VERIFICATION account_service:account_5037 VERIFY_RECORD_ABSENT ABSENT ev=
+    - #7 VERIFICATION security_service:audit_record_5569 VERIFY_RECORD_PRESENT PRESENT ev=
+
+==================================================
+CASE: case_21 | Status: Pred=COMPLETE | Truth=COMPLETE
+Steps count: Pred=1 | Truth=3
+  Missing steps:
+    - #1 VERIFICATION account_service:account_6440 VERIFY_RECORD_ABSENT ABSENT ev=evidence_92
+    - #3 VERIFICATION analytics_platform:analytics_5335 VERIFY_RECORD_ANONYMIZED ANONYMIZED ev=evidence_92
+
+==================================================
+CASE: case_22 | Status: Pred=INCOMPLETE | Truth=INCOMPLETE
+Steps count: Pred=7 | Truth=8
+  Missing steps:
+    - #5 VERIFICATION account_service:account_4990 VERIFY_RECORD_ABSENT ABSENT ev=
+
+==================================================
+CASE: case_23 | Status: Pred=INCOMPLETE | Truth=INCOMPLETE
+Steps count: Pred=3 | Truth=8
+  Missing steps:
+    - #2 FINDING search_service:search_898 REPORT_REMAINING_RECORD PRESENT ev=evidence_92
+    - #4 REMEDIATION search_service:search_898 DELETE_RECORD ABSENT ev=
+    - #5 VERIFICATION account_service:account_410 VERIFY_RECORD_ABSENT ABSENT ev=
+    - #7 VERIFICATION search_service:search_898 VERIFY_RECORD_ABSENT ABSENT ev=
+    - #8 VERIFICATION security_service:audit_record_4128 VERIFY_RECORD_PRESENT PRESENT ev=
+
+==================================================
+CASE: case_24 | Status: Pred=INCOMPLETE | Truth=INCOMPLETE
+Steps count: Pred=3 | Truth=7
+  Missing steps:
+    - #2 FINDING search_service:search_5577 REPORT_REMAINING_RECORD PRESENT ev=evidence_92
+    - #4 REMEDIATION search_service:search_5577 DELETE_RECORD ABSENT ev=
+    - #6 VERIFICATION search_service:search_5577 VERIFY_RECORD_ABSENT ABSENT ev=
+    - #7 VERIFICATION security_service:audit_record_7095 VERIFY_RECORD_PRESENT PRESENT ev=
+
+==================================================
+CASE: case_25 | Status: Pred=COMPLETE | Truth=COMPLETE
+Steps count: Pred=1 | Truth=3
+  Missing steps:
+    - #1 VERIFICATION account_service:account_3136 VERIFY_RECORD_ABSENT ABSENT ev=evidence_92
+    - #3 VERIFICATION analytics_platform:analytics_1895 VERIFY_RECORD_ANONYMIZED ANONYMIZED ev=evidence_92
+
+==================================================
+CASE: case_26 | Status: Pred=COMPLETE | Truth=COMPLETE
+Steps count: Pred=3 | Truth=6
+  Missing steps:
+    - #1 VERIFICATION account_service:account_5684 VERIFY_RECORD_ABSENT ABSENT ev=evidence_92
+    - #3 VERIFICATION support_platform:support_4715 VERIFY_RECORD_REDACTED REDACTED ev=evidence_92
+    - #4 VERIFICATION analytics_platform:analytics_4566 VERIFY_RECORD_ANONYMIZED ANONYMIZED ev=evidence_92
+
+==================================================
+CASE: case_27 | Status: Pred=COMPLETE | Truth=COMPLETE
+Steps count: Pred=3 | Truth=6
+  Missing steps:
+    - #1 VERIFICATION account_service:account_3866 VERIFY_RECORD_ABSENT ABSENT ev=evidence_92
+    - #3 VERIFICATION support_platform:support_4707 VERIFY_RECORD_REDACTED REDACTED ev=evidence_92
+    - #4 VERIFICATION analytics_platform:analytics_4574 VERIFY_RECORD_ANONYMIZED ANONYMIZED ev=evidence_92
+
+==================================================
+CASE: case_28 | Status: Pred=COMPLETE | Truth=COMPLETE
+Steps count: Pred=3 | Truth=6
+  Missing steps:
+    - #1 VERIFICATION account_service:account_5482 VERIFY_RECORD_ABSENT ABSENT ev=evidence_92
+    - #3 VERIFICATION support_platform:support_2351 VERIFY_RECORD_REDACTED REDACTED ev=evidence_92
+    - #4 VERIFICATION analytics_platform:analytics_6077 VERIFY_RECORD_ANONYMIZED ANONYMIZED ev=evidence_92
+
+==================================================
+CASE: case_29 | Status: Pred=INCOMPLETE | Truth=INCOMPLETE
+Steps count: Pred=6 | Truth=14
+  Missing steps:
+    - #1 FINDING search_service:search_1993 REPORT_REMAINING_RECORD PRESENT ev=evidence_92
+    - #3 FINDING support_platform:support_5281 REPORT_EXPOSED_PII PRESENT ev=evidence_92
+    - #6 REMEDIATION search_service:search_1993 DELETE_RECORD ABSENT ev=
+    - #7 REMEDIATION support_platform:support_5281 REDACT_RECORD REDACTED ev=
+    - #9 VERIFICATION account_service:account_7012 VERIFY_RECORD_ABSENT ABSENT ev=
+    - #10 VERIFICATION search_service:search_1993 VERIFY_RECORD_ABSENT ABSENT ev=
+    - #11 VERIFICATION security_service:audit_record_3954 VERIFY_RECORD_PRESENT PRESENT ev=
+    - #12 VERIFICATION support_platform:support_5281 VERIFY_RECORD_REDACTED REDACTED ev=
+
+==================================================
+CASE: case_30 | Status: Pred=INCOMPLETE | Truth=INCOMPLETE
+Steps count: Pred=6 | Truth=14
+  Missing steps:
+    - #1 FINDING search_service:search_9359 REPORT_REMAINING_RECORD PRESENT ev=evidence_92
+    - #3 FINDING support_platform:support_6477 REPORT_EXPOSED_PII PRESENT ev=evidence_92
+    - #6 REMEDIATION search_service:search_9359 DELETE_RECORD ABSENT ev=
+    - #7 REMEDIATION support_platform:support_6477 REDACT_RECORD REDACTED ev=
+    - #9 VERIFICATION account_service:account_4163 VERIFY_RECORD_ABSENT ABSENT ev=
+    - #10 VERIFICATION search_service:search_9359 VERIFY_RECORD_ABSENT ABSENT ev=
+    - #11 VERIFICATION security_service:audit_record_1707 VERIFY_RECORD_PRESENT PRESENT ev=
+    - #12 VERIFICATION support_platform:support_6477 VERIFY_RECORD_REDACTED REDACTED ev=
+
+==================================================
+CASE: case_31 | Status: Pred=COMPLETE | Truth=COMPLETE
+Steps count: Pred=2 | Truth=3
+  Missing steps:
+    - #1 VERIFICATION account_service:account_4857 VERIFY_RECORD_ABSENT ABSENT ev=evidence_51
+
+==================================================
+CASE: case_32 | Status: Pred=INCOMPLETE | Truth=INCOMPLETE
+Steps count: Pred=4 | Truth=5
+  Missing steps:
+    - #3 VERIFICATION account_service:account_8858 VERIFY_RECORD_ABSENT ABSENT ev=
