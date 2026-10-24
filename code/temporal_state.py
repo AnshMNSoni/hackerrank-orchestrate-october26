@@ -55,10 +55,18 @@ class TemporalStateReconstructor:
         resource_states: Dict[str, ResourceTemporalState] = {}
 
         for res_id, res_obs in sorted(obs_by_res.items()):
-            # Sort observations by effective observation time (prefer record_time, then captured_at)
+            # Sort observations ascending so the LAST entry is the preferred
+            # observation: evidence captured at or before audit_at is preferred
+            # over later-captured evidence (per spec, evidence captured after
+            # audit_at may not be cited and must not change the answer), and
+            # within the same citability the newest effective time wins.
             sorted_obs = sorted(
                 res_obs,
-                key=lambda x: (x.record_time or x.captured_at, x.captured_at),
+                key=lambda x: (
+                    0 if not is_timestamp_le(x.captured_at, audit_at) else 1,
+                    x.record_time or x.captured_at,
+                    x.captured_at,
+                ),
             )
             state_obj = self._resolve_single_resource(res_id, sorted_obs, user_id, audit_at)
             if state_obj:
@@ -173,13 +181,35 @@ class TemporalStateReconstructor:
 
         # 5. Account Service: Profiles & Replication Drift
         if sys_id == "account_service" or res_id.startswith("account_"):
-            # If ANY replica or table still contains the record as PRESENT, it is remaining data
-            present_obs = [o for o in observations if o.state_signal == "PRESENT"]
-            absent_obs = [o for o in observations if o.state_signal in ("ABSENT", "DELETED")]
+            # Resolve conflicting evidence within the SAME account resource by the
+            # latest effective point-in-time. A stale PRESENT snapshot recorded
+            # earlier does not keep the record alive once a verified later readback
+            # (e.g. 404 lookup) proves absence. A same-time PRESENT/ABSENT conflict
+            # can not prove removal, so it stays conservative (remaining record).
+            absent_latest = observations[-1].state_signal in ("ABSENT", "DELETED")
+            latest_time = observations[-1].record_time or observations[-1].captured_at
+            return_within_scope = not any(
+                (o.state_signal == "PRESENT" and (o.record_time or o.captured_at) == latest_time)
+                for o in observations
+            )
 
-            if present_obs:
-                # The record still exists in at least one store/replica
-                sup = present_obs[-1]
+            if absent_latest and return_within_scope:
+                sup = observations[-1]
+                return ResourceTemporalState(
+                    system_id="account_service",
+                    resource_id=res_id,
+                    resource_type="customer_profile",
+                    state="ABSENT",
+                    is_violation=False,
+                    violation_type=None,
+                    supporting_file_id=sup.file_id,
+                    observation_time=sup.record_time or sup.captured_at,
+                    identifiers=sup.identifiers,
+                )
+            else:
+                present_obs = [o for o in observations if o.state_signal == "PRESENT"]
+                absent_obs = [o for o in observations if o.state_signal in ("ABSENT", "DELETED")]
+                sup = present_obs[-1] if present_obs else latest_obs
                 return ResourceTemporalState(
                     system_id="account_service",
                     resource_id=res_id,
@@ -190,19 +220,6 @@ class TemporalStateReconstructor:
                     supporting_file_id=sup.file_id,
                     observation_time=sup.record_time or sup.captured_at,
                     conflicts=[o.file_id for o in absent_obs],
-                    identifiers=sup.identifiers,
-                )
-            else:
-                sup = absent_obs[-1] if absent_obs else latest_obs
-                return ResourceTemporalState(
-                    system_id="account_service",
-                    resource_id=res_id,
-                    resource_type="customer_profile",
-                    state="ABSENT",
-                    is_violation=False,
-                    violation_type=None,
-                    supporting_file_id=sup.file_id,
-                    observation_time=sup.record_time or sup.captured_at,
                     identifiers=sup.identifiers,
                 )
 

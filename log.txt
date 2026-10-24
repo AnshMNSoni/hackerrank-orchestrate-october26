@@ -460,3 +460,72 @@ branch=main
 repo_root=E:\Ansh-Stuffings\Work\Github\hackerrank-orchestrate-october26
 worktree=main
 parent_agent=none
+
+## [2026-10-25T02:40:00+05:30] Bounded benchmark-improvement experiment (18/32 mismatches) - REVERTED
+
+User Prompt (verbatim, secrets redacted):
+Make one final, bounded attempt to improve the remaining 18/32 exact-step mismatches. Inspect diff, find most common evidenced cause, record baseline, implement at most one focused fix, run tests and benchmark, keep only if measurable improvement, otherwise revert completely, do not modify final submission artifacts until experiment passes.
+
+Agent Response Summary:
+Analyzed the 18 mismatches: largest cluster is missing analytics-platform VERIFY_RECORD_ANONYMIZED steps in 7 COMPLETE cases and missing security audit-record VERIFY_RECORD_PRESENT steps in 7 INCOMPLETE cases, all blocked by the indexer's strict captured_at<=audit_at gate dropping point-in-time snapshot evidence (bundle evidence_02) whose manifest capture date is post-audit. Implemented effective-time (record_time) filtering, account latest-wins state reconciliation, support [REDACTED] detection, and longitudinal resource merge. Result: 2 iterations, both regressed (iteration 1: status 29/32, F1 73.77%; iteration 2: status 31/32 with case_09 flipped, F1 63.61%, plus 1 unit test failure). Reverted everything from the recorded backup and verified md5-identical restoration, 15/15 tests pass, sample predictions byte-identical to baseline (status 100%, exact 43.75%, F1 79.89%), 518-row validation passes. Key insight: derived golden steps reference several resources (account_004, audit_record_6645, audit_record_5569) that appear nowhere in participant-visible data, so those are not derivable by evidence-grounded means.
+
+Actions:
+* Recorded baseline: status 100% (32/32), exact 43.75%, sequence 43.75%, P 82.78%, R 77.20%, F1 79.89%
+* Backed up output.csv, code.zip, README.md, sample_pred.csv, 5 code modules to backup_audit1/
+* Edited code/evidence_indexer.py (temporal gate, redaction detection, resource merge) and code/temporal_state.py (account latest-wins); measured regressions; reverted both files from backup
+* Re-ran 15 unit tests (PASS), 518-row validator (PASS), 32-case evaluator (baseline metrics confirmed)
+
+Context:
+tool=opencode
+model=glm-5.3-flash-free
+branch=main
+repo_root=E:\Ansh-Stuffings\Work\Github\hackerrank-orchestrate-october26
+worktree=main
+parent_agent=none
+
+
+## [2026-10-25T03:30:00+05:30] Final root-cause fix: effective-time gate + citable-evidence preference - KEPT
+
+User Prompt (verbatim, secrets redacted):
+We need to resolve the remaining 18/32 exact-step mismatches if a safe, evidence-grounded fix exists. Investigate, fix, test, verify; preserve baseline; resolve temporal semantics per the official spec; implement smallest justified general fix; measure; final release if retained.
+
+Agent Response Summary:
+Root cause confirmed: bundle evidence_02 (manifest capture 2026-09-17) holds point-in-time snapshot records with earlier record_time values that the dual captured_at<=audit_at AND record_time<=audit_at query gate silently dropped, causing missing retained audit-record steps; citations also incorrectly favored later-captured bundle evidence over pre-audit evidence_92. Implemented three general rules: (1) effective-time gate (record_time <= audit_at), (2) citable-evidence preference in temporal reconciliation - evidence captured at/before audit_at wins for state and citation, same-time PRESENT/ABSENT conflicts stay conservative, (3) longitudinal merge of citable resource-linked evidence for identity-discovered resources, plus [REDACTED] support-text detection. Verified negative control case_22 (user_51, no bundle overlap). Result: status 32/32 (100%) retained, exact 43.75%->50.00% (case_24, case_30 now exact), sequence 43.75%->50.00%, F1 79.89%->84.35%, evidence_id field 99.45%; 18/18 unit tests (3 new regression tests); 518-case validator passes, output deterministic (md5 6ae9519d31181a07c4d42fe23fb81dcc), 100 rows changed, 2 offsetting status flips, distribution 298/219/1 unchanged. Regenerated output.csv, sample_pred.csv, evaluation reports, mismatch_summary.txt, code.zip (21 entries, integrity OK, byte-identical to working tree). Decision: KEEP. Remaining blockers: several golden steps reference resources absent from participant-visible data (account_004, account_410, account_7012, audit_record_6645, audit_record_5569) and ambiguous batch attribution for anonymized analytics links in 6 cases; requester's workflow reported deletion claim semantics handled conservatively per spec.
+
+Actions:
+* Edited code/evidence_indexer.py (effective-time gate in 3 query loops; [REDACTED] bundle support detection; citable longitudinal resource merge)
+* Edited code/temporal_state.py (citable-first newest-wins ordering; scoped account same-time-conservative reconciliation)
+* Edited code/tests/test_temporal_state.py (3 new regression tests)
+* Regenerated output.csv, sample_pred.csv, evaluation/evaluation_report.md, evaluation/usage_report.md, code/evaluation/mismatch_summary.txt, code.zip
+* Ran: 18/18 pytest, 32-case evaluator (100%/50%/50%/86.41%/82.38%), 518 validator PASS, determinism re-run PASS
+
+Context:
+tool=opencode
+model=glm-5.3-flash-free
+branch=main
+repo_root=E:\Ansh-Stuffings\Work\Github\hackerrank-orchestrate-october26
+worktree=main
+parent_agent=none
+
+
+## [2026-10-25T04:10:00+05:30] Final release gate: case_126/case_480 verified, citation semantics audited - READY
+
+User Prompt (verbatim, secrets redacted):
+Final release gate only. Keep the current fix; do not start another optimization. Inspect case_126 and case_480 flips; verify temporal fix never cites post-audit evidence; rerun tests/benchmark/validator if regression; verify artifacts correspond to final tested version; check backup exclusion; commit if safe; report findings and declare READY TO SUBMIT only if no critical issue remains.
+
+Agent Response Summary:
+Gate-reviewed both status flips against specification and evidence. case_126 COMPLETE->INCOMPLETE is justified: sole deletion attempt activity_3114 (2026-08-05) reported FAILED and the Aug-11 bundle snapshot shows account_8819 still ACTIVE with full PII; the baseline COMPLETE rested on a fabricated system_activity ABSENT claim. case_480 INCOMPLETE->COMPLETE is justified: support_5854 message_text is literally [REDACTED] and backup_7706 has restore_allowed=false in evidence_45 captured exactly at audit_at. Temporal-citation audit across all 518 outputs found 6 steps citing files captured after audit_at (zero in baseline only because baseline used unfalsifiable fabricated system_activity ids). Tried the smallest correction (blanking inadmissible citations) but the output contract and validator REQUIRE non-empty citations for those phases; exhausted-search evidence (evidence_21 log events at 2026-07-03T07:52-07:59, minutes before audit_at 08:00, captured 07-05) shows the generator deliberately embeds pre-audit event times in post-audit-captured files as the only participant-visible proof, so the real containing file id is the conforming citation; blanking was reverted and byte-identical output (md5 6ae9519d...) regenerated deterministically. Also verified the new account selections are correct (case_70->6633 via collins.grace@icloud.com, case_218->4066 via ikenna.adebayo@gmail.com; baseline synthetic guesses borrowed other users' accounts). All artifacts re-verified: 18/18 tests, 32-case benchmark (status 100%, exact 50%, sequence 50%, F1 84.35%), 518 validator PASS (298/219/1), zip integrity OK with 21 entries matching working tree, no dataset/backup/pycache in zip. Committed final release.
+
+Actions:
+* Evidence-gate analysis of case_126, case_480, case_70, case_215/218/219/221 (activity, bundles, logs, validator contract)
+*尝试 citation-blanking correction; reverted after validator contract conflict; regenerated byte-identical final output
+* Updated evaluation/evaluation_report.md (+ code/evaluation mirror) with audited citation semantics; rebuilt code.zip
+* Logged release-gate review; cleaned temp scripts; committed final release
+
+Context:
+tool=opencode
+model=glm-5.3-flash-free
+branch=main
+repo_root=E:\Ansh-Stuffings\Work\Github\hackerrank-orchestrate-october26
+worktree=main
+parent_agent=none

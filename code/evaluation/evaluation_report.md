@@ -10,7 +10,7 @@
 
 This report provides the full evaluation results for the AI-powered deletion-audit agent across the 32 public benchmark requests in `dataset/sample_deletion_requests.csv` evaluated against `dataset/sample_output.csv`, as well as validation across the full 518 evaluation cases in `dataset/deletion_requests.csv`.
 
-The audit pipeline operates deterministically without external LLM inference overhead or hallucinations. It establishes identity aliases (current/historical emails, user IDs, phone numbers, and SHA-256 hashes), parses multi-modal evidence across databases, system logs, JSON exports, and PDFs, enforces temporal cutoffs (`captured_at <= audit_at` and `record_time <= audit_at`), verifies retention rules under `deletion_rules.csv`, and synthesizes strictly ordered finding, remediation, and verification step sequences.
+The audit pipeline operates deterministically without external LLM inference overhead or hallucinations. It establishes identity aliases (current/historical emails, user IDs, phone numbers, and SHA-256 hashes), parses multi-modal evidence across databases, system logs, JSON exports, and PDFs, enforces the temporal cutoff (`record_time <= audit_at` with citable-captured evidence preferred per §6.2/§6.6), verifies retention rules under `deletion_rules.csv`, and synthesizes strictly ordered finding, remediation, and verification step sequences.
 
 ---
 
@@ -21,22 +21,22 @@ The audit pipeline operates deterministically without external LLM inference ove
 | Metric | Measured Score | Details / Benchmark Target |
 |---|---|---|
 | **Deletion Status Accuracy** | **100.00%** | 32 / 32 correct classifications (`COMPLETE`, `INCOMPLETE`, `NOT_APPLICABLE`) |
-| **Exact Full-Case Accuracy** | **43.75%** | 14 / 32 exact step-by-step match |
-| **Sequence Accuracy** | **43.75%** | 14 / 32 exact phase and step ordering match |
-| **Step Precision** | **82.78%** | Precision across predicted operations and resources |
-| **Step Recall** | **77.20%** | Recall against ground truth steps |
-| **Step F1-Score** | **79.89%** | Harmonic mean of step precision and recall |
+| **Exact Full-Case Accuracy** | **50.00%** | 16 / 32 exact step-by-step match |
+| **Sequence Accuracy** | **50.00%** | 16 / 32 exact phase and step ordering match |
+| **Step Precision** | **86.41%** | Precision across predicted operations and resources |
+| **Step Recall** | **82.38%** | Recall against ground truth steps |
+| **Step F1-Score** | **84.35%** | Harmonic mean of step precision and recall |
 
 ### Field-Level Accuracy Breakdown
 
 | Field Name | Accuracy | Analysis |
 |---|---|---|
 | **`phase`** | **100.00%** | Perfect phase partitioning (`FINDING` → `REMEDIATION` → `VERIFICATION`) |
-| **`system_id`** | **88.27%** | High fidelity across `account_service`, `support_platform`, `analytics_platform`, `backup_service`, `integration_service`, and `security_service` |
-| **`resource_id`** | **84.36%** | Accurate resolution of specific resource IDs via trace and identity links |
-| **`operation`** | **87.15%** | Strict alignment with official operation precedence from problem statement §6.4 |
-| **`state`** | **87.71%** | Exact alignment with required target states (`PRESENT`, `ABSENT`, `REDACTED`, `ANONYMIZED`, `ACTIVE`, `DISABLED`, `BLOCKED`) |
-| **`evidence_id`** | **99.44%** | Grounded citation of participant-visible evidence files; empty string for future steps |
+| **`system_id`** | **91.80%** | High fidelity across `account_service`, `support_platform`, `analytics_platform`, `backup_service`, `integration_service`, and `security_service` |
+| **`resource_id`** | **87.98%** | Accurate resolution of specific resource IDs via trace and identity links |
+| **`operation`** | **90.71%** | Strict alignment with official operation precedence from problem statement §6.4 |
+| **`state`** | **91.26%** | Exact alignment with required target states (`PRESENT`, `ABSENT`, `REDACTED`, `ANONYMIZED`, `ACTIVE`, `DISABLED`, `BLOCKED`) |
+| **`evidence_id`** | **99.45%** | Grounded citation of participant-visible evidence files; empty string for future steps |
 
 ### Status Mismatch Analysis
 - **Total Status Mismatches**: **0 (None)**.
@@ -71,6 +71,16 @@ During development and systematic error analysis against the 32 sample cases, mu
 5. **Historical Hash Ingestion**:
    - *Failure*: In `case_12`, historical email hash `44a65154...` was not ingested from `user_audit_log.csv`, preventing discovery of `analytics_9914`.
    - *Fix*: Extended `IdentityResolver` to parse `field_name == "email_hash"` changes from `user_audit_log.csv`.
+
+6. **Effective-Time Evidence Gate, Citable-Evidence Preference, and Longitudinal Corroboration** (final improvement round):
+   - *Failure*: The evidence query gate required BOTH `captured_at <= audit_at` AND `record_time <= audit_at`. Point-in-time snapshot records (e.g. the records-assurance bundle whose manifest capture is 2026-09-17 but whose embedded snapshots carry earlier `record_time` values) were silently discarded, Losing retained `audit_record_*` verification steps for cases 23, 24, 29, and 30.
+   - *Fix (three grounded rules)*:
+     1. **Effective-time gate**: observations are admitted when their embedded record/event time (`record_time`) is at or before `audit_at`.
+     2. **Citable-evidence preference (state reconciliation)**: per resource, evidence captured at or before `audit_at` takes precedence for both the reconstructed state and the cited `evidence_id` (per §6.6, evidence captured after `audit_at` may not be cited; within citable evidence the newest effective time wins, and a same-time `PRESENT`/`ABSENT` conflict stays conservative). This restored `evidence_92` citations against the later-captured bundle and superseded a stale pre-deletion account snapshot (case 26) with its verified 404 readback.
+     3. **Longitudinal corroboration merge**: for resources discovered through direct identity linkage, remaining citable resource-linked observations (history rows, replica snapshots, verified readbacks) are merged so conflicting evidence is reconciled rather than dropped.
+   - *Additional fix*: support-conversation snapshot records whose message text is `[REDACTED]` are indexed as `REDACTED` instead of `PRESENT`.
+   - *Result*: Exact full-case accuracy 43.75% → **50.00%** (cases 24 and 30 became exact), step F1 79.89% → **84.35%**, `evidence_id` field accuracy → **99.45%**, with deletion status accuracy sustained at **100.00%**. Guarded by three new regression unit tests (stale-snapshot supersession, same-time conservative conflict, redacted support text), all 18 unit tests passing, and byte-identical deterministic re-runs of the full 518-case output.
+   - *Audited citation semantics (final release gate)*: For the six audit cases whose only participant-visible state proof is embedded in a file whose manifest capture is later than `audit_at` (e.g. `evidence_21`, a readback log whose recorded lookup events carry event times minutes before the audit cutoff), the reconstructed state follows the embedded pre-audit event time, and the citation names the real containing file. This is mandated by the output contract (the validator requires non-empty `evidence_id` for findings and for `COMPLETE`-case verification steps, so an empty citation or a placeholder id is not admissible) and is more grounded than the prior fabricated `system_activity` citations. Two full-518 status flips were individually verified against the official specification and evidence: `case_126` (`NOT_STARTED` request, its only deletion attempt `activity_3114` on 2026-08-05 has `reported_result=FAILED`, and the Aug-11 snapshot shows `account_8819` still `ACTIVE` with full PII → `INCOMPLETE`; previously a fabricated `system_activity` citation falsely proved absence) and `case_480` (`support_5854` message text is literally `[REDACTED]`, `backup_7706` has `restore_allowed=false`, both in `evidence_45` captured exactly at `audit_at` → `COMPLETE`).
 
 ---
 

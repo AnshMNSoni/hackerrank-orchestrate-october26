@@ -545,6 +545,9 @@ class EvidenceIndexer:
                     name = rec.get("name") or rec.get("full_name") or rec.get("display_name")
                     phone = rec.get("phone")
 
+                    msg_text = str(rec.get("message_text") or rec.get("message") or "")
+                    redacted_text = "[REDACTED]" in msg_text or msg_text.strip().lower() == "redacted"
+
                     if uid and res_id and res_id.startswith("account_"):
                         self.user_to_account[uid] = res_id
                         self.account_to_user[res_id] = uid
@@ -582,6 +585,9 @@ class EvidenceIndexer:
                             )
                         )
                     else:
+                        state_sig = "PRESENT"
+                        if redacted_text:
+                            state_sig = "REDACTED"
                         self._add_observation(
                             EvidenceObservation(
                                 file_id=fid,
@@ -591,7 +597,7 @@ class EvidenceIndexer:
                                 system_id=dstore,
                                 resource_id=res_id,
                                 resource_type=collection,
-                                state_signal="PRESENT",
+                                state_signal=state_sig,
                                 identifiers={"user_id": uid, "email": email, "name": name, "phone": phone},
                                 raw_payload=rec,
                             )
@@ -1281,7 +1287,7 @@ class EvidenceIndexer:
 
         # Query by user_id
         for obs in self.obs_by_user_id.get(user_id, []):
-            if is_timestamp_le(obs.captured_at, audit_at) and is_timestamp_le(obs.record_time, audit_at):
+            if is_timestamp_le(obs.record_time or obs.captured_at, audit_at):
                 key = (obs.file_id, obs.resource_id, obs.state_signal)
                 if key not in seen:
                     seen.add(key)
@@ -1290,7 +1296,7 @@ class EvidenceIndexer:
         # Query by each email alias
         for em in emails:
             for obs in self.obs_by_email.get(em.strip().lower(), []):
-                if is_timestamp_le(obs.captured_at, audit_at) and is_timestamp_le(obs.record_time, audit_at):
+                if is_timestamp_le(obs.record_time or obs.captured_at, audit_at):
                     key = (obs.file_id, obs.resource_id, obs.state_signal)
                     if key not in seen:
                         seen.add(key)
@@ -1299,7 +1305,7 @@ class EvidenceIndexer:
         # Query by each email hash
         for h in hashes:
             for obs in self.obs_by_hash.get(h.strip().lower(), []):
-                if is_timestamp_le(obs.captured_at, audit_at) and is_timestamp_le(obs.record_time, audit_at):
+                if is_timestamp_le(obs.record_time or obs.captured_at, audit_at):
                     key = (obs.file_id, obs.resource_id, obs.state_signal)
                     if key not in seen:
                         seen.add(key)
@@ -1327,6 +1333,20 @@ class EvidenceIndexer:
                 discovered_resources.add(act["resource_id"])
                 if act["resource_id"].startswith("account_"):
                     has_account_resource = True
+
+        # Corroborate discovered resources with their remaining citable evidence
+        # (history table rows, replica snapshots, verified readbacks). Only
+        # resource IDs discovered through direct identity linkage are merged, so
+        # no unrelated person's records can be pulled in; and only evidence
+        # captured at or before audit_at is admitted.
+        for res in list(discovered_resources):
+            for o in self.obs_by_resource_id.get(res, []):
+                if is_timestamp_le(o.captured_at, audit_at):
+                    key = (o.file_id, o.resource_id, o.state_signal)
+                    if key not in seen:
+                        seen.add(key)
+                        results.append(o)
+        has_account_resource = any(r.startswith("account_") for r in discovered_resources)
 
         # 2. If no account resource is discovered yet:
         if not has_account_resource:

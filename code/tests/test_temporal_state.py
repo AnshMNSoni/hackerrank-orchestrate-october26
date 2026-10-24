@@ -134,6 +134,113 @@ class TestTemporalStateReconstructor(unittest.TestCase):
         self.assertTrue(st_dirty.is_violation)
         self.assertEqual(st_dirty.violation_type, "EXPOSED_PII")
 
+    def test_stale_snapshot_superseded_by_later_verified_absence(self):
+        # Regression for cases 26/27/28: an older pre-deletion account snapshot
+        # (recorded earlier than audit_at) must not keep the record alive once a
+        # verified later readback (404 lookup) proves absence within its scope.
+        obs = [
+            EvidenceObservation(
+                file_id="evidence_02",
+                source_path="evidence/records/customer_data_snapshot_bundle_20260917.json",
+                captured_at="2026-09-17T12:00:00Z",
+                record_time="2026-09-09T12:00:00Z",
+                system_id="account_service",
+                resource_id="account_5684",
+                resource_type="customer_profile",
+                state_signal="PRESENT",
+            ),
+            EvidenceObservation(
+                file_id="evidence_92",
+                source_path="evidence/records/service_resource_export_20260915_114455.json",
+                captured_at="2026-09-15T11:44:55Z",
+                record_time="2026-09-15T09:01:48Z",
+                system_id="account_service",
+                resource_id="account_5684",
+                resource_type="customer_profile",
+                state_signal="ABSENT",
+            ),
+        ]
+        states = self.reconstructor.reconstruct_states(obs, "user_26", "2026-09-15T12:00:00Z")
+        st = states["account_5684"]
+        self.assertEqual(st.state, "ABSENT")
+        self.assertFalse(st.is_violation)
+        # The supporting evidence must be the later verified readback
+        self.assertEqual(st.supporting_file_id, "evidence_92")
+
+    def test_same_time_conflict_stays_conservative(self):
+        # A PRESENT/ABSENT conflict recorded at the same effective time cannot
+        # prove removal; it stays a remaining record (conservative).
+        obs = [
+            EvidenceObservation(
+                file_id="evidence_a",
+                source_path="evidence/databases/customer_accounts_failover_replica_20260902.sql",
+                captured_at="2026-09-02T23:00:00Z",
+                record_time="2026-09-02T22:45:00Z",
+                system_id="account_service",
+                resource_id="account_123",
+                resource_type="customer_profile",
+                state_signal="PRESENT",
+            ),
+            EvidenceObservation(
+                file_id="evidence_b",
+                source_path="evidence/logs/resource_lookup_trace.log",
+                captured_at="2026-09-02T23:00:00Z",
+                record_time="2026-09-02T22:45:00Z",
+                system_id="account_service",
+                resource_id="account_123",
+                resource_type="customer_profile",
+                state_signal="ABSENT",
+            ),
+        ]
+        states = self.reconstructor.reconstruct_states(obs, "user_05", "2026-09-08T13:40:00Z")
+        st = states["account_123"]
+        self.assertEqual(st.state, "PRESENT")
+        self.assertTrue(st.is_violation)
+
+    def test_support_redacted_text_is_not_exposed_pii(self):
+        # '[REDACTED]' message text in a snapshot support conversation must not
+        # be treated as exposed PII.
+        from code.evidence_indexer import EvidenceIndexer
+        import tempfile, json as jsonlib
+
+        bundle = {
+            "exported_at": "2026-09-17T12:00:00Z",
+            "source": "records_assurance_service",
+            "snapshots": [
+                {
+                    "captured_at": "2026-09-15T12:00:00Z",
+                    "data_store": "support_platform",
+                    "collection": "support_conversations",
+                    "records": [
+                        {
+                            "resource_id": "support_9901",
+                            "ticket_id": "CS-9990",
+                            "subject_reference": "user_26",
+                            "channel": "email",
+                            "message_text": "[REDACTED]",
+                        }
+                    ],
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            rel = os.path.join("evidence", "records")
+            os.makedirs(os.path.join(tmp, rel), exist_ok=True)
+            with open(os.path.join(tmp, rel, "customer_data_snapshot_bundle_20260917.json"), "w", encoding="utf-8") as f:
+                jsonlib.dump(bundle, f)
+            with open(os.path.join(tmp, "evidence_files.csv"), "w", encoding="utf-8") as f:
+                f.write("file_id,file_path,origin,captured_at\n")
+                f.write("evidence_T," + rel + "/customer_data_snapshot_bundle_20260917.json,records_assurance_snapshot_bundle,2026-09-17T12:00:00Z\n")
+            indexer = EvidenceIndexer(tmp)
+            matched = [o for o in indexer.obs_by_user_id.get("user_26", []) if o.resource_id == "support_9901"]
+            self.assertTrue(matched, "subject-linked support record must be identity-indexed")
+            self.assertEqual(matched[0].state_signal, "REDACTED")
+
+            states = self.reconstructor.reconstruct_states(matched, "user_26", "2026-09-15T12:00:00Z")
+            st = states["support_9901"]
+            self.assertEqual(st.state, "REDACTED")
+            self.assertFalse(st.is_violation)
+
 
 if __name__ == "__main__":
     unittest.main()
