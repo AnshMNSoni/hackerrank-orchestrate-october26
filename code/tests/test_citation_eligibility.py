@@ -5,6 +5,7 @@ case's audit_at, and findings supported only by such a file must instead cite
 an eligible pre-audit system activity for the same resource.
 """
 
+import csv
 import os
 import sys
 import unittest
@@ -189,6 +190,172 @@ class TestCitationEligibility(unittest.TestCase):
         self.assertEqual(act["reported_result"], "FAILED")
         self.assertEqual(act["resource_id"], "account_8819")
         self.assertTrue(is_timestamp_le(act["event_time"], "2026-08-17T10:00:00Z"))
+
+    def _verif(self, ev, res, op="VERIFY_RECORD_ABSENT", state="ABSENT"):
+        return {
+            "step_no": 1,
+            "phase": "VERIFICATION",
+            "system_id": "account_service",
+            "resource_id": res,
+            "operation": op,
+            "state": state,
+            "evidence_id": ev,
+        }
+
+    # --- citable-witness preference for COMPLETE-case verifications ---
+
+    def test_absent_verification_prefers_same_case_citable_citation(self):
+        # A verification citing a post-audit-captured file must be re-pointed
+        # to the citable file the same case already cites (the same subject's
+        # citable audit-dossier witness). No case id logic.
+        obs_post = SimpleNamespace(record_time=None, captured_at="2026-07-02T00:00:00Z", file_id="evidence_post")
+        agent = make_agent(
+            evidence_files={
+                "evidence_post": SimpleNamespace(file_id="evidence_post", file_path="p", origin="o",
+                                                 captured_at="2026-07-05T07:00:00Z"),
+                "evidence_witness": SimpleNamespace(file_id="evidence_witness", file_path="p2", origin="o2",
+                                                    captured_at="2026-07-03T07:00:00Z"),
+            },
+            system_activities=[],
+        )
+        steps = [
+            self._verif("evidence_post", "account_1"),
+            self._verif("evidence_witness", "audit_record_1", op="VERIFY_RECORD_PRESENT", state="PRESENT"),
+        ]
+        out = agent._apply_citation_eligibility(steps, AUDIT_AT)
+        self.assertEqual(out[0]["evidence_id"], "evidence_witness")
+        self.assertEqual(out[1]["evidence_id"], "evidence_witness")
+
+    def test_absent_verification_falls_back_to_subject_scoped_citable_file(self):
+        agent = make_agent(
+            evidence_files={
+                "evidence_post": SimpleNamespace(file_id="evidence_post", file_path="p", origin="o",
+                                                 captured_at="2026-07-05T07:00:00Z"),
+                "evidence_a": SimpleNamespace(file_id="evidence_a", file_path="p2", origin="o2",
+                                              captured_at="2026-07-03T07:00:00Z"),
+                "evidence_b_late": SimpleNamespace(file_id="evidence_b_late", file_path="p3", origin="o3",
+                                                   captured_at="2026-07-06T07:00:00Z"),
+            },
+            system_activities=[],
+        )
+        agent.evidence_indexer.obs_by_user_id = {
+            "user_9": [SimpleNamespace(record_time="2026-07-03T05:00:00Z",
+                                       captured_at="2026-07-03T07:00:00Z", file_id="evidence_a"),
+                       SimpleNamespace(record_time="2026-07-03T05:00:00Z",
+                                       captured_at="2026-07-06T07:00:00Z", file_id="evidence_b_late")],
+        }
+        agent.evidence_indexer.obs_by_email = {}
+        agent.evidence_indexer.obs_by_hash = {}
+        steps = [self._verif("evidence_post", "account_2")]
+        out = agent._apply_citation_eligibility(
+            steps, AUDIT_AT, user_id="user_9", emails=["u9@example.com"], hashes=["h9"],
+            observations=[],
+        )
+        self.assertEqual(out[0]["evidence_id"], "evidence_a")
+
+    def test_absent_verification_without_citable_candidate_is_unchanged(self):
+        agent = make_agent(
+            evidence_files={
+                "evidence_post": SimpleNamespace(file_id="evidence_post", file_path="p", origin="o",
+                                                 captured_at="2026-07-05T07:00:00Z"),
+            },
+            system_activities=[],
+        )
+        agent.evidence_indexer.obs_by_user_id = {}
+        agent.evidence_indexer.obs_by_email = {}
+        agent.evidence_indexer.obs_by_hash = {}
+        steps = [self._verif("evidence_post", "account_3")]
+        out = agent._apply_citation_eligibility(
+            steps, AUDIT_AT, user_id="user_8", emails=["u8@example.com"], hashes=[],
+            observations=[],
+        )
+        self.assertEqual(out[0]["evidence_id"], "evidence_post")
+
+    def test_citable_verification_is_never_touched(self):
+        agent = make_agent(
+            evidence_files={
+                "evidence_ok": SimpleNamespace(file_id="evidence_ok", file_path="p", origin="o",
+                                               captured_at="2026-07-01T07:00:00Z"),
+                "evidence_other": SimpleNamespace(file_id="evidence_other", file_path="p2", origin="o2",
+                                                  captured_at="2026-07-02T07:00:00Z"),
+            },
+            system_activities=[],
+        )
+        steps = [
+            self._verif("evidence_ok", "account_4"),
+            self._verif("evidence_other", "audit_record_4", op="VERIFY_RECORD_PRESENT", state="PRESENT"),
+        ]
+        out = agent._apply_citation_eligibility(steps, AUDIT_AT)
+        self.assertEqual(out[0]["evidence_id"], "evidence_ok")
+        self.assertEqual(out[1]["evidence_id"], "evidence_other")
+
+    def test_success_and_partial_delete_claims_never_become_verification_citations(self):
+        agent = make_agent(
+            evidence_files={
+                "evidence_post": SimpleNamespace(file_id="evidence_post", file_path="p", origin="o",
+                                                 captured_at="2026-07-05T07:00:00Z"),
+            },
+            system_activities=[
+                {"activity_id": "activity_20", "event_time": "2026-07-01T09:00:00Z",
+                 "event_type": "DELETE_RECORD", "reported_result": "SUCCESS",
+                 "resource_id": "account_5", "details": ""},
+                {"activity_id": "activity_21", "event_time": "2026-07-01T10:00:00Z",
+                 "event_type": "DELETE_RECORD", "reported_result": "PARTIAL",
+                 "resource_id": "account_5", "details": ""},
+            ],
+        )
+        agent.evidence_indexer.obs_by_user_id = {}
+        agent.evidence_indexer.obs_by_email = {}
+        agent.evidence_indexer.obs_by_hash = {}
+        steps = [self._verif("evidence_post", "account_5")]
+        out = agent._apply_citation_eligibility(
+            steps, AUDIT_AT, user_id="user_7", emails=["u7@example.com"], hashes=[],
+            observations=[],
+        )
+        self.assertEqual(out[0]["evidence_id"], "evidence_post")
+
+    def test_real_case_70_absent_citation_becomes_evidence_93(self):
+        agent = make_agent_from_real_dataset()
+        steps = [
+            self._verif("evidence_06", "account_6633"),
+            self._verif("evidence_93", "audit_record_1738", op="VERIFY_RECORD_PRESENT", state="PRESENT"),
+        ]
+        out = agent._apply_citation_eligibility(
+            steps, "2026-09-16T09:00:00Z", user_id="user_68",
+            emails=["collins.grace@icloud.com"], hashes=["90d09f3df13df7c987633adf915ab5624896522461d8ec7c3aae5e8164670686"],
+            observations=[],
+        )
+        self.assertEqual(out[0]["evidence_id"], "evidence_93")
+        self.assertEqual(out[1]["evidence_id"], "evidence_93")
+
+    def test_real_case_215_absent_citation_becomes_evidence_81(self):
+        agent = make_agent_from_real_dataset()
+        steps = [
+            self._verif("evidence_21", "account_1956"),
+            self._verif("evidence_81", "audit_record_1718", op="VERIFY_RECORD_PRESENT", state="PRESENT"),
+        ]
+        out = agent._apply_citation_eligibility(
+            steps, "2026-07-03T08:00:00Z", user_id="user_213",
+            emails=["nils-lindberg@proton.me"], hashes=["ab0e7ffacd95eac905fff1e4dc3ee2db8c0eed4636d1381ca6e7af29202ff761"],
+            observations=[],
+        )
+        self.assertEqual(out[0]["evidence_id"], "evidence_81")
+        self.assertEqual(out[1]["evidence_id"], "evidence_81")
+
+    def test_real_end_to_end_audit_case_70_and_215(self):
+        agent = make_agent_from_real_dataset()
+        rows = {r["case_id"]: r for r in csv.DictReader(
+            open("dataset/deletion_requests.csv", encoding="utf-8-sig"))}
+        for cid, want_ev in (("case_70", "evidence_93"), ("case_215", "evidence_81")):
+            cid_out, status, steps = agent.audit_case(rows[cid])
+            self.assertEqual(cid_out, cid)
+            self.assertEqual(status, "COMPLETE", cid)
+            absent_steps = [s for s in steps if s["operation"] == "VERIFY_RECORD_ABSENT"]
+            self.assertEqual(len(absent_steps), 1, cid)
+            self.assertEqual(absent_steps[0]["evidence_id"], want_ev, cid)
+            for s in steps:
+                self.assertNotEqual(s["evidence_id"], "evidence_06")
+                self.assertNotEqual(s["evidence_id"], "evidence_21")
 
 
 if __name__ == "__main__":

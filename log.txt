@@ -574,3 +574,26 @@ branch=main
 repo_root=E:\Ansh-Stuffings\Work\Github\hackerrank-orchestrate-october26
 worktree=main
 parent_agent=none
+
+
+## [2026-10-25T06:20:00+05:30] Required fix applied: citable-witness verification citations - READY
+
+User Prompt (verbatim, secrets redacted):
+Apply the one required evidence-supported fix from the final adjudication: prefer eligible pre-audit citable inventory evidence for COMPLETE-case verifications; correct case_70 (evidence_93) and cases 215/218/219/221 (evidence_81) with general regression tests and no hardcoded case ids; run full test suite, sample benchmark, validator, reproducibility check; rebuild code.zip and update reports/log; concise READY/NOT READY decision.
+
+Agent Response Summary:
+Extended main.py::_apply_citation_eligibility with Pass 2 (general citable-witness preference for verification steps citing post-audit-captured files; candidates in deterministic order: same-case citable citations, then subject-scoped citable observation files sorted by file_id; no case ids in production logic; no activity claims; no state changes). Verified: exactly 5 rows changed (case_70 evidence_06 -> evidence_93; cases 215/218/219/221 evidence_21 -> evidence_81), one field each, zero status changes, distribution 298/219/1 unchanged. Added 8 regression tests (18 now in test_citation_eligibility.py): same-case citable preference, subject-scope fallback by lowest file id, no-candidate retention, citable-untouched, SUCCESS/PARTIAL claims never verifications, real case_70/case_215 unit-level + real end-to-end audit_case integration. Results: 36/36 tests pass, sample_pred.csv byte-identical (sample benchmark identical: status 100%, exact 50.00%, sequence 50.00%, F1 84.35%), 518 validator PASS (298/219/1), post-fix citation audit 0 of 518 steps citing post-audit-captured evidence files or post-audit activity ids, deterministic double-run md5 ff731eba2ba04021a96374c6f7d11545 (output.csv promoted at that hash). Reports updated (evaluation_report.md fix marked APPLIED with post-fix verification numbers, 18 tests; usage_report.md md5/timestamp) with byte-identical code/evaluation mirrors; code.zip rebuilt (22 entries, integrity OK, all entries byte-identical to working tree, no dataset/backup/pycache). Note: two sequential full runs once exceeded the command timeout (7 min each) - rerun individually, both deterministic; one regenerations pass and one promotion all consistent. backup_audit1/ and backup_audit2/ remain untracked and excluded from the zip.
+
+Actions:
+* code/main.py: extended _apply_citation_eligibility (Pass 2 citable-witness preference) + caller wiring (user context, gated observations)
+* code/tests/test_citation_eligibility.py: +8 regression tests (witness preference, fallback, retention, no-claim-substitution, real case integration)
+* Regenerated output.csv (md5 ff731eba2ba04021a96374c6f7d11545), sample_pred.csv byte-identical, mismatch_summary.txt, evaluation reports + usage reports, code.zip rebuilt
+* Full battery rerun before commit: tests, validator, benchmark, citation audit
+
+Context:
+tool=opencode
+model=glm-5.3-flash-free
+branch=main
+repo_root=E:\Ansh-Stuffings\Work\Github\hackerrank-orchestrate-october26
+worktree=main
+parent_agent=none

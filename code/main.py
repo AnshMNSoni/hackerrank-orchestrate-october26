@@ -13,7 +13,7 @@ import csv
 import json
 import os
 import sys
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 # Ensure repository root is in sys.path
 repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -92,12 +92,25 @@ class DeletionAuditAgent:
         steps = self.remediation_planner.plan_steps(eval_result)
 
         # 6.5 Citation-eligibility enforcement (AGENTS.md sections 6.2 / 6.6)
-        steps = self._apply_citation_eligibility(steps, audit_at)
+        steps = self._apply_citation_eligibility(
+            steps,
+            audit_at,
+            user_id=user.user_id,
+            emails=user.all_emails,
+            hashes=user.email_hashes,
+            observations=observations,
+        )
 
         return case_id, eval_result.status, steps
 
     def _apply_citation_eligibility(
-        self, steps: List[Dict[str, Any]], audit_at: str
+        self,
+        steps: List[Dict[str, Any]],
+        audit_at: str,
+        user_id: str = "",
+        emails: Iterable[str] = (),
+        hashes: Iterable[str] = (),
+        observations: Iterable[Any] = (),
     ) -> List[Dict[str, Any]]:
         """Enforce the citation-temporal rule on planned steps.
 
@@ -105,20 +118,31 @@ class DeletionAuditAgent:
         after the case's ``audit_at``, and use only information available at
         or before ``audit_at`` when deciding the case.
 
-        The dataset records pre-audit event times inside files whose manifest
-        capture is later than ``audit_at`` (snapshot bundles and
-        central-observability logs). When a finding's only supporting file was
-        captured after ``audit_at`` but an eligible pre-audit system activity
-        exists for exactly that resource, the citation is swapped to that
-        ``activity_id``: the specification allows findings to cite a
-        participant-visible ``file_id``, ``activity_id``, or ``audit_id``
-        (section 6.6), and the output contract requires a non-empty citation
-        for finding steps.
+        Pass 1 (finding steps): the dataset records pre-audit event times
+        inside files whose manifest capture is later than ``audit_at``
+        (snapshot bundles and central-observability logs). When a finding's
+        only supporting file was captured after ``audit_at`` but an eligible
+        pre-audit system activity exists for exactly that resource, the
+        citation is swapped to that ``activity_id``: the specification allows
+        findings to cite a participant-visible ``file_id``, ``activity_id``,
+        or ``audit_id`` (section 6.6), and the output contract requires a
+        non-empty citation for finding steps. Only failed or partial delete
+        attempts on the same resource support a remaining-record finding.
 
-        Only failed or partial delete attempts on the same resource support a
-        remaining-record finding. Verification steps are not swapped: a
-        ``SUCCESS`` activity is a reported claim, not proof of final state
-        (section 6.5), so verifications keep their containing-file citation.
+        Pass 2 (verification steps with non-empty citations, i.e. the
+        verification-before-remediation steps of COMPLETE cases): when the
+        cited file was captured after ``audit_at``, prefer an eligible
+        citable witness instead of a post-audit-captured file and instead of
+        a SUCCESS/PARTIAL activity claim (a reported claim is not proof of
+        final state, section 6.5). Citable-witness preference order, with no
+        case-specific logic:
+          1. a file other steps of the same case already cite that was
+             captured at or before ``audit_at`` (the same subject's audit
+             dossier);
+          2. otherwise, a citable file carrying an effective-time
+             observation for the same subject (sorted by ``file_id``).
+        If no citable candidate exists, the containing-file citation is kept
+        and the residual conflict is documented in the evaluation report.
         """
         if not audit_at or not steps:
             return steps
@@ -141,6 +165,11 @@ class DeletionAuditAgent:
             if current is None or not is_timestamp_le(act["event_time"], current["event_time"]):
                 eligible_delete[resource_id] = act
 
+        def is_citable(fid: str) -> bool:
+            captured = captured_by_file.get(fid)
+            return bool(captured) and is_timestamp_le(captured, audit_at)
+
+        # Pass 1: finding citations.
         for step in steps:
             if step.get("phase") != "FINDING":
                 continue
@@ -153,6 +182,45 @@ class DeletionAuditAgent:
             replacement = eligible_delete.get((step.get("resource_id") or "").strip())
             if replacement:
                 step["evidence_id"] = replacement["activity_id"]
+
+        # Pass 2: citable-witness preference for verification citations.
+        inadmissible = []
+        for step in steps:
+            if step.get("phase") != "VERIFICATION":
+                continue
+            cited = step.get("evidence_id") or ""
+            if not cited or not cited.startswith("evidence_"):
+                continue
+            captured = captured_by_file.get(cited)
+            if captured is None or is_timestamp_le(captured, audit_at):
+                continue
+            inadmissible.append(step)
+
+        if inadmissible:
+            candidates: List[str] = []
+            for prior in steps:
+                prior_cited = prior.get("evidence_id") or ""
+                if prior_cited.startswith("evidence_") and prior_cited not in candidates \
+                        and is_citable(prior_cited):
+                    candidates.append(prior_cited)
+            if user_id or emails or hashes:
+                subject_files = set()
+                keys = ("user_id", "email", "hash")
+                store = (self.evidence_indexer.obs_by_user_id, self.evidence_indexer.obs_by_email,
+                         self.evidence_indexer.obs_by_hash)
+                values = ([user_id], [e for e in emails if e], [h for h in hashes if h])
+                for k, bucket, vals in zip(keys, store, values):
+                    for v in vals:
+                        for obs in bucket.get(v, []):
+                            rec_t = obs.record_time or obs.captured_at
+                            if rec_t and is_timestamp_le(rec_t, audit_at):
+                                subject_files.add(obs.file_id)
+                for fid in sorted(subject_files):
+                    if fid not in candidates and is_citable(fid):
+                        candidates.append(fid)
+            for step in inadmissible:
+                if candidates:
+                    step["evidence_id"] = candidates[0]
         return steps
 
     def run_csv(self, input_csv_path: str, output_csv_path: str):
