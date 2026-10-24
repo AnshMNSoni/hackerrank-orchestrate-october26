@@ -39,6 +39,53 @@ python3 code/main.py
 
 The blank template at `dataset/output.csv` is provided as a reference. Your final generated file for submission must be the root-level `output.csv`.
 
+### Setup
+
+Requirements: Python 3.10+ (standard library only; no mandatory dependencies).
+
+Optional but recommended for full PDF evidence parsing:
+
+```bash
+pip install pypdf
+```
+
+Without `pypdf` the pipeline still runs, but PDF evidence attachments degrade to no extraction.
+
+### Run the full audit (518 cases → `output.csv`)
+
+From the repository root:
+
+```bash
+python code/main.py --dataset dataset --input dataset/deletion_requests.csv --output output.csv
+```
+
+This produces the root-level `output.csv` with 518 sorted data rows (header: `case_id,deletion_status,steps_json`). The pipeline is fully deterministic and makes no network calls.
+
+Other useful commands:
+
+```bash
+# Audit only the 32 public sample cases
+python code/main.py --dataset dataset --input dataset/sample_deletion_requests.csv --output sample_pred_audit.csv
+
+# Run the unit tests (15 tests)
+python -m pytest code/tests -q --ignore=code/tests/validate_submission_output.py
+
+# Validate the submission output.csv (row count, schema, JSON, ordering)
+python code/tests/validate_submission_output.py
+
+# Evaluate predictions against the sample ground truth
+python code/evaluation/evaluator.py --pred sample_pred_audit.csv --truth dataset/sample_output.csv
+```
+
+## Solution Architecture
+
+The pipeline in `code/` is deterministic and evidence-grounded:
+
+1. **Identity resolution** (`identity_resolver.py`) — resolves current and historical identifiers (emails, SHA-256 hashes, phones) from `user_identities.csv` and `user_audit_log.csv`.
+2. **Evidence indexing** (`evidence_indexer.py`) — parses SQL snapshot exports, JSON bundles, logs, PDFs, and `system_activity.csv` into observations with strict temporal cutoffs (`captured_at <= audit_at`).
+3. **Temporal reconstruction** (`temporal_state.py`) — builds the resource state at `audit_at`, filtering out operation-start events and later evidence.
+4. **Policy evaluation** (`policy_engine.py`) — classifies intent from `request_text` and applies `deletion_rules.csv`, including tombstone redact/anonymize/retain semantics.
+5. **Step planning** (`remediation_planner.py`) — emits findings, ordered remediation, and verification steps in the required `FINDING → REMEDIATION → VERIFICATION` order.
 
 ## Dataset
 
