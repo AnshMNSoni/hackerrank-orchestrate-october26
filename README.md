@@ -67,7 +67,7 @@ Other useful commands:
 # Audit only the 32 public sample cases
 python code/main.py --dataset dataset --input dataset/sample_deletion_requests.csv --output sample_pred_audit.csv
 
-# Run the unit tests (15 tests)
+# Run the unit tests (36 tests)
 python -m pytest code/tests -q --ignore=code/tests/validate_submission_output.py
 
 # Validate the submission output.csv (row count, schema, JSON, ordering)
@@ -86,6 +86,48 @@ The pipeline in `code/` is deterministic and evidence-grounded:
 3. **Temporal reconstruction** (`temporal_state.py`) — builds the resource state at `audit_at`, filtering out operation-start events and later evidence.
 4. **Policy evaluation** (`policy_engine.py`) — classifies intent from `request_text` and applies `deletion_rules.csv`, including tombstone redact/anonymize/retain semantics.
 5. **Step planning** (`remediation_planner.py`) — emits findings, ordered remediation, and verification steps in the required `FINDING → REMEDIATION → VERIFICATION` order.
+6. **Citation-eligibility enforcement** (`main.py::_apply_citation_eligibility`) — enforces the written temporal citation rules on the final planned steps (see *Approach Overview* below).
+
+## Approach Overview
+
+The agent answers each case by reconstructing *what was true at `audit_at`* from participant-visible evidence only — never from reported statuses, and never from evidence that became available after the audit cutoff.
+
+**Pipeline flow per case**
+
+1. **Intent gate (NOT_APPLICABLE)** — `request_text` is classified for deletion authorization. Access, correction, export, or marketing opt-out requests are `NOT_APPLICABLE` with empty steps, even when other fields resemble a deletion case.
+2. **Identity resolution** — the request email may be a historical address. The resolver merges the current identity snapshot (`user_identities.csv`) with the change history (`user_audit_log.csv`) into the live `user_id` plus the set of all historical emails, phones, and SHA-256 email hashes, so evidence recorded under any prior identifier is linked.
+3. **Effective-time evidence gate** — every evidence observation is admitted only if its file was captured at or before `audit_at` **and** its embedded record/event time is at or before `audit_at`. Manifest capture time (`captured_at`) and effective state time (`record_time`) are treated as distinct axes.
+4. **Temporal reconciliation** — for each resource linked to the subject (accounts, audit records, support records, search indexes, analytics profiles, exports, connectors, backups), the newest admitted observation wins within the same resource scope; same-time PRESENT/ABSENT conflicts resolve conservatively (presence-heavy); identical subject–collection observations captured at different times merge longitudinally so a resource linked by means of multiple files remains reachable.
+5. **Policy application** — `deletion_rules.csv` maps each data category to its required treatment: `DELETE`, `REDACT` (direct identifiers removed, stable reference preserved — account tombstones), `ANONYMIZE`, or `RETAIN`. A violation is a resource whose reconstructed state differs from its required treatment.
+6. **Status decision** — `INCOMPLETE` when any policy violation or recreation risk (active data flow / restorable backup) remains at `audit_at`; `COMPLETE` only when every relevant copy has its required treatment, every retained record remains available, and no flow can recreate prohibited data.
+7. **Step planning and citation enforcement** — findings, ordered remediation (`DISABLE_DATA_FLOW`/`BLOCK_RESTORE` before record-level action; downstream copies before sources), and verification steps are emitted with consecutive numbering; then `_apply_citation_eligibility` enforces the citation rules below.
+
+**Evidence semantics — claims versus proof**
+
+- `system_activity.csv` rows (workflow claims such as `DELETE_RECORD … SUCCESS/FAILED/PARTIAL`) and reported statuses are **claims, not proof** of final state; they corroborate but never alone establish it.
+- Records themselves (SQL snapshots, bundles, readback logs, support/redaction records, inventories) are the state-defining evidence. A scope-witness snapshot that lists the subject's retention records while showing no remaining subject rows is valid absence evidence.
+
+**Citation rules (spec §6.2/§6.6 semantics)**
+
+- No step may cite an evidence file whose manifest capture is after `audit_at`, and no post-audit activity may support a decision.
+- `INCOMPLETE` cases: findings cite the participant-visible `file_id`/`activity_id`/`audit_id` that proves them; when the only supporting file was post-audit-captured, the finding cites the eligible pre-audit `activity_id` of a `FAILED`/`PARTIAL` delete on the same resource (`SUCCESS` claims are never substituted). Proposed remediation and future verification steps carry empty `evidence_id`.
+- `COMPLETE` cases (all steps are `VERIFICATION`): the citation must be non-empty and must prove the compliant state at `audit_at`. When a step cites a post-audit-captured file, a **citable-witness preference** re-points it — deterministically — first to a citable file the same case already cites, else to the lowest-`file_id` citable file carrying an effective-time observation for the same subject. Activity claims are never used as verification citations and resource states are never altered by this pass.
+
+**Determinism and cost**
+
+Standard library only (`pypdf` optional), no LLM/network calls, fixed ordering everywhere (`FINDING → REMEDIATION → VERIFICATION`, then operation precedence, `system_id`, `resource_id`), stable JSON serialization. Re-running the full 518-case audit reproduces `output.csv` byte-identically (final run md5 `ff731eba2ba04021a96374c6f7d11545`).
+
+**Verified results snapshot** (36/36 unit tests; deterministic re-runs; submission validator passes all 518 rows):
+
+| Metric (32 public cases) | Value |
+| --- | --- |
+| Deletion-status accuracy | **100.00%** (32/32) |
+| Exact full-case accuracy | **50.00%** (16/32) |
+| Sequence accuracy | **50.00%** (16/32) |
+| Step precision / recall / F1 | 86.41% / 82.38% / **84.35%** |
+| Status distribution (518 cases) | INCOMPLETE 298 · COMPLETE 219 · NOT_APPLICABLE 1 |
+
+Temporal integrity is audited end-to-end: zero steps across all 518 outputs cite evidence captured after `audit_at` or post-audit activity ids. Full details, custom evaluation cases, and the token/cost breakdown are in `code/evaluation/evaluation_report.md` and `code/evaluation/usage_report.md`.
 
 ## Dataset
 

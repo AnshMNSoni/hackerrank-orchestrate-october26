@@ -597,3 +597,24 @@ branch=main
 repo_root=E:\Ansh-Stuffings\Work\Github\hackerrank-orchestrate-october26
 worktree=main
 parent_agent=none
+
+
+## [2026-10-25T06:40:00+05:30] README: complete approach overview added to submission README
+
+User Prompt (verbatim, secrets redacted):
+README - setup instructions and approach overview. Add this in our Readme file. The things required in the zip - source code, README with setup and approach overview. Is this present; if yes print ok, else add the complete readme with setup and approach overview.
+
+Agent Response Summary:
+README.md was already inside code.zip (22-entry manifest) with setup instructions, but the approach overview was only a 5-bullet architecture list and the test count was stale. Added a full Approach Overview section (intent gate, identity resolution across current+historical identifiers, effective-time evidence gate separating captured_at from record_time, temporal reconciliation rules, policy application incl. tombstone semantics, status decision, step ordering, evidence claims-vs-proof semantics, the citation-eligibility rules and the citable-witness preference, determinism and cost notes), added a verified results snapshot table, updated the stale unit-test count to 36, and listed citation enforcement in the architecture list. Rebuilt code.zip and verified: 22 entries, integrity OK, all entries byte-identical to working tree, README inside zip contains both Setup and Approach Overview plus the results snapshot, no dataset/backup/pycache entries. Re-verified 36/36 tests PASS and 518 validator PASS (298/219/1); output.csv untouched (md5 ff731eba2ba04021a96374c6f7d11545).
+
+Actions:
+* README.md: added Approach Overview + results snapshot, updated tests count and architecture list
+* code.zip rebuilt and verified from updated README
+
+Context:
+tool=opencode
+model=glm-5.3-flash-free
+branch=main
+repo_root=E:\Ansh-Stuffings\Work\Github\hackerrank-orchestrate-october26
+worktree=main
+parent_agent=none
